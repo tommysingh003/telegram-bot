@@ -36,3 +36,6 @@ if __name__ == "__main__":
         return "Bot is running!"
     if __name__ == "__main__":
         app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+
+# Set webhook URL (replace with your Render URL)
+await application.bot.set_webhook(url="https://your-bot.onrender.com/webhook")
