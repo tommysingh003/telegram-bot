@@ -1,6 +1,1 @@
-python-telegram-bot==20.6
-requests==2.31.0
-beautifulsoup4==4.12.0
-flask==2.0.3
-werkzeug==2.0.3
-aiohttp
+pip install python-telegram-bot requests beautifulsoup4 aiohttp flask gunicorn
