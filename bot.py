@@ -8,6 +8,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 from bs4 import BeautifulSoup
 from flask import Flask
 from threading import Thread
+def run_flask():
+    """Runs Flask using Gunicorn."""
+    port = int(os.environ.get("PORT", 5000))  # Ensure Render assigns a port
+    os.system(f"gunicorn -w 4 -b 0.0.0.0:{port} wsgi:app")
 
 # Configuration
 DOWNLOAD_WEBSITE = "https://theteradownloader.com"
