@@ -1,13 +1,4 @@
-telethon
-cryptg
-pyaes
-aiohttp
-aiodns
-aiohttp[speedups]
-pillow
-hachoir
-requests
-redis
-FastTelethonhelper
-humanreadable
-pillow
+python-telegram-bot==20.5
+flask==2.0.3
+requests==2.31.0
+beautifulsoup4==4.12.0
