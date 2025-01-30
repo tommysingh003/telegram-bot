@@ -80,4 +80,64 @@ async def download_video(update: Update, context):
         await update.message.reply_text("❌ An error occurred. Please try again later.")
 
 def get_download_link(video_url):
-    """Scrape download link from theteradownload
+    """Scrape download link from theteradownloader.com using BeautifulSoup"""
+    try:
+        # Configure headers to mimic browser request
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://theteradownloader.com/",
+        }
+        
+        # Submit video URL to the website
+        payload = {"url": video_url}
+        response = requests.post(DOWNLOAD_WEBSITE, data=payload, headers=headers)
+        response.raise_for_status()  # Raise error for bad status codes
+        
+        # Parse HTML response
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        # Find download button - ADJUST THIS SELECTOR BASED ON ACTUAL WEBSITE STRUCTURE
+        download_button = soup.find("a", {"class": "download-btn"})  # Example
+        
+        if download_button and "href" in download_button.attrs:
+            return download_button["href"]
+        else:
+            logger.error("Download button not found in HTML.")
+            return None
+
+    except Exception as e:
+        logger.error(f"Scraping error: {e}")
+        return None
+
+# ========== Flask Server (for Render compatibility) ==========
+@app.route('/')
+def home():
+    return "Video Downloader Bot is running!"
+
+def run_flask():
+    """Run Flask server in separate thread"""
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+# ========== Main Execution ==========
+if __name__ == "__main__":
+    # Verify token exists
+    if not TOKEN:
+        raise ValueError("Missing Telegram token! Set the 'TOKEN' environment variable.")
+    
+    # Start Flask server in separate thread
+    flask_thread = Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    # Initialize and run Telegram bot
+    application = ApplicationBuilder().token(TOKEN).build()
+    
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_video))
+    
+    # Run bot
+    logger.info("Bot is running...")
+    application.run_polling()
