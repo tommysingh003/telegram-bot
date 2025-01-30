@@ -1,1 +1,7 @@
-pip install python-telegram-bot requests beautifulsoup4 aiohttp flask gunicorn
+pip 
+python-telegram-bot
+requests 
+beautifulsoup4
+aiohttp 
+flask 
+gunicorn
