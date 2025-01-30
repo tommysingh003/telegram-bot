@@ -36,6 +36,20 @@ if __name__ == "__main__":
         return "Bot is running!"
     if __name__ == "__main__":
         app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+from flask import Flask, request
+import os
 
-# Set webhook URL (replace with your Render URL)
-await application.bot.set_webhook(url="https://your-bot.onrender.com/webhook")
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+if __name__ == "__main__":
+    # Start Flask server in a thread
+    import threading
+    port = int(os.environ.get("PORT", 10000))
+    threading.Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": port}).start()
+    
+    # Start the Telegram bot
+    application.run_polling()
