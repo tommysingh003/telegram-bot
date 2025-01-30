@@ -1,3 +1,4 @@
+application.run_polling()
 import os
 import logging
 import asyncio
@@ -12,6 +13,14 @@ def run_flask():
     """Runs Flask using Gunicorn."""
     port = int(os.environ.get("PORT", 5000))  # Ensure Render assigns a port
     os.system(f"gunicorn -w 4 -b 0.0.0.0:{port} wsgi:app")
+if WEBHOOK_URL:
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        webhook_url=f"{WEBHOOK_URL}/{TOKEN}",
+    )
+else:
+    application.run_polling()
 
 # Configuration
 DOWNLOAD_WEBSITE = "https://theteradownloader.com"
