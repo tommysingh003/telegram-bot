@@ -2,7 +2,7 @@ import os
 import logging
 import asyncio
 import aiohttp
-import requests  # FIXED: Added missing import
+import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from bs4 import BeautifulSoup
@@ -10,16 +10,17 @@ from flask import Flask
 from threading import Thread
 
 # Configuration
-DOWNLOAD_WEBSITE = "https://theteradownloader.com"  # Change if needed
-TOKEN = os.environ.get("TOKEN")  # Ensure this is set in Render
+DOWNLOAD_WEBSITE = "https://theteradownloader.com"
+TOKEN = os.environ.get("TOKEN")  # Set this in Render or your environment
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")  # Set this for webhook support
 
-# Initialize Flask app
+# Initialize Flask app (For Render)
 app = Flask(__name__)
 
 # Configure logging
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ async def start(update: Update, context):
     """Handles the /start command."""
     await update.message.reply_text(
         "🚀 Welcome to Video Downloader Bot!\n"
-        "Send me a video link (YouTube, Instagram, etc.) and I'll download it for you!"
+        "Send me a video link (YouTube, Instagram, etc.), and I'll download it for you!"
     )
 
 async def download_video(update: Update, context):
@@ -41,9 +42,9 @@ async def download_video(update: Update, context):
         await update.message.reply_text("❌ Please send a valid URL starting with http:// or https://")
         return
 
-    try:
-        await update.message.reply_text("⏳ Processing your request...")
+    await update.message.reply_text("⏳ Processing your request...")
 
+    try:
         # Fetch the download link using a separate thread
         download_link = await asyncio.to_thread(get_download_link, url)
 
@@ -62,11 +63,7 @@ async def download_video(update: Update, context):
         await update.message.reply_text("📤 Uploading video...")
 
         with open(video_path, "rb") as video_file:
-            await context.bot.send_video(
-                chat_id=chat_id,
-                video=video_file,
-                supports_streaming=True
-            )
+            await context.bot.send_video(chat_id=chat_id, video=video_file, supports_streaming=True)
 
         os.remove(video_path)  # Cleanup after sending
 
@@ -82,13 +79,13 @@ def get_download_link(video_url):
         }
         payload = {"url": video_url}
         response = requests.post(DOWNLOAD_WEBSITE, data=payload, headers=headers)
-        response.raise_for_status()  # Raise an exception for bad status codes
+        response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Find the first <a> tag with a download link
         for link in soup.find_all("a"):
-            if "download" in link.get_text(strip=True).lower() or "href" in link.attrs:
+            if "download" in link.get_text(strip=True).lower() and link.has_attr("href"):
                 return link["href"]
 
         return None
@@ -114,14 +111,15 @@ async def download_and_save_video(url):
         logger.exception(f"Video download failed: {e}")
     return None
 
-# ========== Flask Server ==========
-@app.route('/')
+# ========== Flask Server for Render ==========
+@app.route("/")
 def home():
     return "Bot is running"
 
 def run_flask():
+    """Runs Flask in a separate thread."""
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    os.system(f"gunicorn -w 4 -b 0.0.0.0:{port} wsgi:app")
 
 # ========== Main Execution ==========
 if __name__ == "__main__":
@@ -139,10 +137,13 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_video))
 
-    logger.info("Bot is running...")
-    application.run_polling()
-    def run_flask():
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
-
-
+    if WEBHOOK_URL:
+        # Webhook mode
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.environ.get("PORT", 5000)),
+            webhook_url=f"{WEBHOOK_URL}/{TOKEN}",
+        )
+    else:
+        # Polling mode (useful for local testing)
+        application.run_polling()
