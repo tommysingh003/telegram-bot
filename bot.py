@@ -1,4 +1,5 @@
-import os
+# Constants
+DOWNLOAD_WEBSITE = "https://theteradownloader.com"  # Replace with your websiteimport os
 import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
