@@ -6,18 +6,20 @@ from selenium.webdriver.chrome.options import Options
 import time
 import os
 import subprocess
+import platform
 
-# Install ChromeDriver on Render
-subprocess.run(["apt-get", "update"])
-subprocess.run(["apt-get", "install", "-y", "chromium-chromedriver"])
-os.environ["CHROMEDRIVER_PATH"] = "/usr/bin/chromedriver"
+# Install ChromeDriver on Render (Linux only)
+if platform.system() == "Linux":
+    subprocess.run(["apt-get", "update"])
+    subprocess.run(["apt-get", "install", "-y", "chromium-chromedriver"])
+    os.environ["CHROMEDRIVER_PATH"] = "/usr/bin/chromedriver"
 
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
 # Telegram Bot Token
-TOKEN = os.getenv("7828188600:AAEoqP_VhVpFKInLEAnPS3F_t-o4peM9hV4")
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")  # Ensure this is in your .env file
 
 # Initialize the bot
 def start(update: Update, context: CallbackContext) -> None:
@@ -63,7 +65,7 @@ def handle_message(update: Update, context: CallbackContext) -> None:
 
 def main() -> None:
     # Set up the Telegram bot
-    updater = Updater(7828188600:AAEoqP_VhVpFKInLEAnPS3F_t-o4peM9hV4)
+    updater = Updater(TOKEN)  # Use the TOKEN variable
     dispatcher = updater.dispatcher
 
     # Add handlers
