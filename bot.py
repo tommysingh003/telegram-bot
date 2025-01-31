@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Telegram Bot Token
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TOKEN = os.getenv("7828188600:AAEoqP_VhVpFKInLEAnPS3F_t-o4peM9hV4")
 
 # Initialize the bot
 def start(update: Update, context: CallbackContext) -> None:
@@ -63,7 +63,7 @@ def handle_message(update: Update, context: CallbackContext) -> None:
 
 def main() -> None:
     # Set up the Telegram bot
-    updater = Updater(TOKEN)
+    updater = Updater(7828188600:AAEoqP_VhVpFKInLEAnPS3F_t-o4peM9hV4)
     dispatcher = updater.dispatcher
 
     # Add handlers
