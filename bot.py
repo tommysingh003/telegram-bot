@@ -1,143 +1,78 @@
-import os
-import logging
-import requests
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
-from bs4 import BeautifulSoup
-from flask import Flask
-from threading import Thread
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+import time
+import os
+import subprocess
 
-# Configuration
-DOWNLOAD_WEBSITE = "https://theteradownloader.com"
-TOKEN = os.environ.get("TOKEN")  # Set this in Render environment variables
+# Install ChromeDriver on Render
+subprocess.run(["apt-get", "update"])
+subprocess.run(["apt-get", "install", "-y", "chromium-chromedriver"])
+os.environ["CHROMEDRIVER_PATH"] = "/usr/bin/chromedriver"
 
-# Initialize Flask app
-app = Flask(__name__)
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
 
-# Configure logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+# Telegram Bot Token
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# ========== Telegram Bot Functions ==========
-async def start(update: Update, context):
-    """Handle /start command"""
-    await update.message.reply_text(
-        "🚀 Welcome to Video Downloader Bot!\n"
-        "Send me a video link (YouTube, Instagram, etc.) and I'll download it for you!"
-    )
+# Initialize the bot
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("Welcome! Send me a video link to download.")
 
-async def download_video(update: Update, context):
-    """Handle video download requests"""
-    url = update.message.text
-    chat_id = update.message.chat_id
-    
-    # Validate URL format
-    if not url.startswith(("http://", "https://")):
-        await update.message.reply_text("❌ Please send a valid URL starting with http:// or https://")
-        return
+def handle_message(update: Update, context: CallbackContext) -> None:
+    user_message = update.message.text
+    update.message.reply_text(f"Processing your link: {user_message}")
+
+    # Set up Selenium WebDriver
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    driver = webdriver.Chrome(options=chrome_options)
 
     try:
-        # Show processing message
-        await update.message.reply_text("⏳ Processing your request...")
-        
-        # Get download link from website
-        download_link = get_download_link(url)
-        
-        if not download_link:
-            await update.message.reply_text("❌ Could not find download link. Please try another URL.")
-            return
+        # Visit the website
+        driver.get("https://theteradownloader.com/")
 
-        # Download the video
-        await update.message.reply_text("⬇️ Downloading video...")
-        video_response = requests.get(download_link, stream=True)
-        
-        if video_response.status_code == 200:
-            # Save video temporarily
-            with open("video.mp4", "wb") as f:
-                for chunk in video_response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-            
-            # Send video to user
-            await update.message.reply_text("📤 Uploading video...")
-            with open("video.mp4", "rb") as f:
-                await context.bot.send_video(
-                    chat_id=chat_id,
-                    video=f,
-                    supports_streaming=True
-                )
-            
-            # Clean up
-            os.remove("video.mp4")
-        else:
-            await update.message.reply_text("❌ Failed to download video from the website.")
+        # Find the input field and enter the link
+        input_field = driver.find_element(By.NAME, "url")
+        input_field.send_keys(user_message)
+
+        # Find and click the submit button
+        submit_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Download')]")
+        submit_button.click()
+
+        # Wait for the download link to appear
+        time.sleep(10)  # Adjust based on website response time
+
+        # Find the download link
+        download_link = driver.find_element(By.PARTIAL_LINK_TEXT, "Download")
+        video_url = download_link.get_attribute("href")
+
+        # Send the download link to the user
+        update.message.reply_text(f"Here's your download link: {video_url}")
 
     except Exception as e:
-        logger.error(f"Error: {e}")
-        await update.message.reply_text("❌ An error occurred. Please try again later.")
+        update.message.reply_text(f"An error occurred: {e}")
+    finally:
+        driver.quit()
 
-def get_download_link(video_url):
-    """Scrape download link from theteradownloader.com using BeautifulSoup"""
-    try:
-        # Configure headers to mimic browser request
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://theteradownloader.com/",
-        }
-        
-        # Submit video URL to the website
-        payload = {"url": video_url}
-        response = requests.post(DOWNLOAD_WEBSITE, data=payload, headers=headers)
-        response.raise_for_status()  # Raise error for bad status codes
-        
-        # Parse HTML response
-        soup = BeautifulSoup(response.text, "html.parser")
-        
-        # Find download button - ADJUST THIS SELECTOR BASED ON ACTUAL WEBSITE STRUCTURE
-        download_button = soup.find("a", {"class": "download-btn"})  # Example
-        
-        if download_button and "href" in download_button.attrs:
-            return download_button["href"]
-        else:
-            logger.error("Download button not found in HTML.")
-            return None
+def main() -> None:
+    # Set up the Telegram bot
+    updater = Updater(TOKEN)
+    dispatcher = updater.dispatcher
 
-    except Exception as e:
-        logger.error(f"Scraping error: {e}")
-        return None
-
-# ========== Flask Server (for Render compatibility) ==========
-@app.route('/')
-def home():
-    return "Video Downloader Bot is running!"
-
-def run_flask():
-    """Run Flask server in separate thread"""
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
-
-# ========== Main Execution ==========
-if __name__ == "__main__":
-    # Verify token exists
-    if not TOKEN:
-        raise ValueError("Missing Telegram token! Set the 'TOKEN' environment variable.")
-    
-    # Start Flask server in separate thread
-    flask_thread = Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-
-    # Initialize and run Telegram bot
-    application = ApplicationBuilder().token(TOKEN).build()
-    
     # Add handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_video))
-    
-    # Run bot
-    logger.info("Bot is running...")
-    application.run_polling()
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+
+    # Start the bot
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == "__main__":
+    main()
